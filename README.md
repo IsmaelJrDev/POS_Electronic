@@ -12,5 +12,3 @@ Algunos de los puntos a evaluar durante el rpoyecto fueron:
 - La nota de remisión se debe enviar vía WhatsApp o e-mail
 - La nota de remisión debe mostrar el descuento del IVA(16%)  y el total a pagar.
 
-
-
