@@ -13,4 +13,6 @@ Algunos de los puntos a evaluar durante el rpoyecto fueron:
 - La nota de remisión debe mostrar el descuento del IVA(16%)  y el total a pagar.
 
 
+
+
  
