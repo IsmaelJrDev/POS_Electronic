@@ -14,5 +14,3 @@ Algunos de los puntos a evaluar durante el rpoyecto fueron:
 
 
 
-
- 
