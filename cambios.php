@@ -1,211 +1,147 @@
 <?php
 // Conexión a la base de datos
-$conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
-
-if ($conexion->connect_error) {
-    die("Conexión fallida: " . $conexion->connect_error);
+$conn = new mysqli("localhost", "root", "root", "SistemaPOS");
+if ($conn->connect_error) {
+    die("Conexión fallida: " . $conn->connect_error);
 }
-
 
 $mensaje = null;
 $productos = [];
-$ventas = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Consultar Productos
+
+    // CONSULTAR PRODUCTO
     if (isset($_POST['consultar'])) {
         $criterio = $_POST['criterio'];
-        $stmt = $conn->prepare("CALL ConsultarProductos(?)");
-        $stmt->bind_param("s", $criterio);
+        $param = "%$criterio%";
+
+        if (is_numeric($criterio)) {
+            $stmt = $conn->prepare("SELECT * FROM Productos WHERE ProductoID = ? OR Nombre LIKE ?");
+            $stmt->bind_param("is", $criterio, $param);
+        } else {
+            $stmt = $conn->prepare("SELECT * FROM Productos WHERE Nombre LIKE ?");
+            $stmt->bind_param("s", $param);
+        }
+
         $stmt->execute();
         $result = $stmt->get_result();
         $productos = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();    
+        $stmt->close();
 
-        // Verificar si se encontraron productos
         if (count($productos) == 0) {
-            echo "<script>alert('El ID del producto ingresado no existe.');</script>";
+            echo "<script>alert('El ID o nombre del producto no existe.');</script>";
         }
     }
 
-
-    // Registrar Producto
+    // REGISTRAR PRODUCTO
     if (isset($_POST['registrar'])) {
         $nombre = $_POST['nombre'];
         $precio = $_POST['precio'];
         $stock = $_POST['stock'];
-    
-        // Validación para asegurarse de que los valores no sean negativos
-        if ($precio < 0) {
-            $mensaje = "No puedes ingresar valores en negativo";
-        } elseif ($stock < 0) {
+
+        if ($precio < 0 || $stock < 0) {
             $mensaje = "No puedes ingresar valores en negativo";
         } else {
-            // Subir la imagen
             if ($_FILES['foto']['error'] === UPLOAD_ERR_OK) {
-                $fileTmpPath = $_FILES['foto']['tmp_name'];
-                $fileName = $_FILES['foto']['name'];
-                $fileSize = $_FILES['foto']['size'];
-                $fileType = $_FILES['foto']['type'];
-    
-                // Aseguramos que la carpeta uploads exista
                 $uploadDir = 'uploads/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0777, true);
-                }
-    
-                $filePath = $uploadDir . basename($fileName);
-    
-                // Mover el archivo de la carpeta temporal a la carpeta uploads
-                if (move_uploaded_file($fileTmpPath, $filePath)) {
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+                $filePath = $uploadDir . basename($_FILES['foto']['name']);
+                if (move_uploaded_file($_FILES['foto']['tmp_name'], $filePath)) {
                     $foto = $filePath;
+
+                    $stmt = $conn->prepare("INSERT INTO Productos (Nombre, Precio, Stock, foto) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("sdss", $nombre, $precio, $stock, $foto);
+                    if ($stmt->execute()) {
+                        $mensaje = "Producto registrado correctamente.";
+                    } else {
+                        $mensaje = "Error al registrar producto.";
+                    }
+                    $stmt->close();
                 } else {
                     $mensaje = "Error al subir la imagen.";
                 }
             }
-    
-            if (isset($foto)) {
-                try {
-                    $stmt = $conn->prepare("CALL RegistrarProducto(?, ?, ?, ?)");
-                    $stmt->bind_param("sdss", $nombre, $precio, $stock, $foto);
-                    $stmt->execute();
-    
-                    $result = $stmt->get_result();
-                    $mensaje = $result->fetch_assoc()['Mensaje'];
-                    $stmt->close();
-                } catch (Exception $e) {
-                    $mensaje = $e->getMessage();
-                }
-            }
         }
-    
-        // Si hay mensaje, mostrarlo como un alert en JavaScript
-        if (isset($mensaje)) {
-            echo "<script>alert('$mensaje');</script>";
-        }
+
+        if (isset($mensaje)) echo "<script>alert('$mensaje');</script>";
     }
-    
-    // Eliminar Producto
+
+    // ELIMINAR PRODUCTO
     if (isset($_POST['eliminar'])) {
         $productoID = $_POST['productoID'];
-    
-        try {
-            $stmt = $conn->prepare("CALL EliminarProducto(?)");
-            $stmt->bind_param("i", $productoID);
-            $stmt->execute();
-    
-            $result = $stmt->get_result();
-            $productos = $result->fetch_all(MYSQLI_ASSOC);
-            $mensaje = $result->fetch_assoc()['Mensaje'];
-            $stmt->close();
-        } catch (Exception $e) {
-            $mensaje = $e->getMessage();
+
+        $stmt = $conn->prepare("DELETE FROM Productos WHERE ProductoID = ?");
+        $stmt->bind_param("i", $productoID);
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            echo "<script>alert('Producto eliminado exitosamente.');</script>";
+        } else {
+            echo "<script>alert('El ID del producto no existe.');</script>";
         }
-    
-        // Verificar si se encontraron productos
-        if (count($productos) == 0) {
-            echo "<script>alert('El ID del producto ingresado no existe.');</script>";
-        }
+        $stmt->close();
     }
-    
-        // Modificar Producto
+
+    // MODIFICAR PRODUCTO
     if (isset($_POST['modificar'])) {
         $productoID = $_POST['productoID'];
         $nombre = $_POST['nombre'];
         $precio = $_POST['precio'];
         $stock = $_POST['stock'];
-    
-        // Verificar si el precio o el stock son negativos
-        if ($precio < 0) {
-            echo "<script>alert('Ingreso un valor negativo o un id de un producto no existente');</script>";
-        } elseif ($stock < 0) {
-            echo "<script>alert('Ingreso un valor negativo o un id de un producto no existente');</script>";
+
+        if ($precio < 0 || $stock < 0) {
+            echo "<script>alert('Valor negativo o ID inexistente.');</script>";
         } else {
-            // Verificamos si se ha subido una nueva foto
+            $foto = null;
             if ($_FILES['foto']['error'] === UPLOAD_ERR_OK) {
-                $fileTmpPath = $_FILES['foto']['tmp_name'];
-                $fileName = $_FILES['foto']['name'];
-                $fileSize = $_FILES['foto']['size'];
-                $fileType = $_FILES['foto']['type'];
-    
-                // Aseguramos que la carpeta uploads exista
                 $uploadDir = 'uploads/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0777, true);
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+                $filePath = $uploadDir . basename($_FILES['foto']['name']);
+                if (move_uploaded_file($_FILES['foto']['tmp_name'], $filePath)) {
+                    $foto = $filePath;
                 }
-    
-                $filePath = $uploadDir . basename($fileName);
-    
-                // Mover el archivo de la carpeta temporal a la carpeta uploads
-                if (move_uploaded_file($fileTmpPath, $filePath)) {
-                    $foto = $filePath; // Actualizamos la foto con la nueva ruta
-                } else {
-                    $mensaje = "Error al subir la nueva imagen.";
-                }
+            }
+
+            if ($foto) {
+                $stmt = $conn->prepare("UPDATE Productos SET Nombre=?, Precio=?, Stock=?, foto=? WHERE ProductoID=?");
+                $stmt->bind_param("sdssi", $nombre, $precio, $stock, $foto, $productoID);
             } else {
-                // Si no se subió una nueva foto, podemos dejar el valor de la foto como nulo o con la foto existente
-                $foto = null;
+                $stmt = $conn->prepare("UPDATE Productos SET Nombre=?, Precio=?, Stock=? WHERE ProductoID=?");
+                $stmt->bind_param("dsdi", $nombre, $precio, $stock, $productoID);
             }
-    
-            // Procedemos a modificar el producto, incluyendo la foto si la cargó
-            try {
-                // Si hay foto nueva, la actualizamos
-                if ($foto) {
-                    $stmt = $conn->prepare("CALL ModificarProducto(?, ?, ?, ?, ?)");
-                    $stmt->bind_param("isdss", $productoID, $nombre, $precio, $stock, $foto);
-                } else {
-                    // Si no hay foto nueva, no la actualizamos
-                    $stmt = $conn->prepare("CALL ModificarProducto(?, ?, ?, ?, NULL)");
-                    $stmt->bind_param("isd", $productoID, $nombre, $precio, $stock);
-                }
-    
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $mensaje = $result->fetch_assoc()['Mensaje'];
-                $stmt->close();
-            } catch (Exception $e) {
-                $mensaje = $e->getMessage();
+
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                echo "<script>alert('Producto modificado correctamente.');</script>";
+            } else {
+                echo "<script>alert('No se pudo modificar el producto.');</script>";
             }
+
+            $stmt->close();
         }
     }
+
+    // AGREGAR STOCK
     if (isset($_POST['agregarStock'])) {
         $productoID = $_POST['productoID'];
         $cantidad = $_POST['cantidad'];
-    
-        // Verificar si la cantidad es negativa
+
         if ($cantidad < 0) {
-            echo "<script>alert('Ingresó un valor negativo.');</script>";
+            echo "<script>alert('Cantidad negativa.');</script>";
         } else {
-            try {
-                // Verificar si el producto existe
-                $stmt = $conn->prepare("SELECT COUNT(*) AS Existe FROM Productos WHERE ProductoID = ?");
-                $stmt->bind_param("i", $productoID);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $existe = $result->fetch_assoc()['Existe'];
-                $stmt->close();
-    
-                if ($existe == 0) {
-                    // Si el producto no existe, mostrar alerta
-                    echo "<script>alert('El ID del producto no existe.');</script>";
-                } else {
-                    // Si el producto existe, llamar al procedimiento para actualizar el stock
-                    $stmt = $conn->prepare("CALL ActualizarStock(?, ?)");
-                    $stmt->bind_param("ii", $productoID, $cantidad);
-                    $stmt->execute();
-                    $stmt->close();
-    
-        
-                }
-            } catch (Exception $e) {
-                echo "<script>alert('Ocurrió un error al actualizar el stock.');</script>";
+            $stmt = $conn->prepare("UPDATE Productos SET Stock = Stock + ? WHERE ProductoID = ?");
+            $stmt->bind_param("ii", $cantidad, $productoID);
+            $stmt->execute();
+
+            if ($stmt->affected_rows > 0) {
+                echo "<script>alert('Stock actualizado correctamente.');</script>";
+            } else {
+                echo "<script>alert('El ID del producto no existe.');</script>";
             }
+
+            $stmt->close();
         }
     }
-    
-
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="es">

@@ -9,53 +9,52 @@ if ($conexion->connect_error) {
 $mensaje = null;
 $ventas = [];
 $detalleVentas = [];
-$ventasConPuntos = [];
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Mostrar Ventas
     if (isset($_POST['mostrarVentas'])) {
-        $stmt = $conn->prepare("CALL MostrarVentas()");
-        $stmt->execute();
-
-        $ventas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $sql = "SELECT * FROM Ventas";
+        $resultado = $conexion->query($sql);
+        if ($resultado) {
+            $ventas = $resultado->fetch_all(MYSQLI_ASSOC);
+        }
     }
 
     // Mostrar Detalle de Ventas
     if (isset($_POST['mostrarDetalleVentas'])) {
-        $stmt = $conn->prepare("CALL MostrarDetalleVentas()");
-        $stmt->execute();
-
-        $detalleVentas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-    }
-
-    // Mostrar Ventas con Puntos
-    if (isset($_POST['mostrarVentasConPuntos'])) {
-        $stmt = $conn->prepare("CALL MostrarVentasConPuntos()");
-        $stmt->execute();
-
-        $ventasConPuntos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        $sql = "SELECT * FROM DetalleVentas";
+        $resultado = $conexion->query($sql);
+        if ($resultado) {
+            $detalleVentas = $resultado->fetch_all(MYSQLI_ASSOC);
+        }
     }
 
     // Eliminar Venta
     if (isset($_POST['eliminarVenta'])) {
         $ventaID = $_POST['ventaID'];
-    
+
         try {
-            $stmt = $conn->prepare("CALL EliminarVentaPorID(?)");
-            $stmt->bind_param("i", $ventaID);
-            $stmt->execute();
-    
+            // Eliminar primero los detalles relacionados
+            $conexion->begin_transaction();
+
+            $stmt1 = $conexion->prepare("DELETE FROM DetalleVentas WHERE id_venta = ?");
+            $stmt1->bind_param("i", $ventaID);
+            $stmt1->execute();
+            $stmt1->close();
+
+            // Luego eliminar la venta principal
+            $stmt2 = $conexion->prepare("DELETE FROM Ventas WHERE id_venta = ?");
+            $stmt2->bind_param("i", $ventaID);
+            $stmt2->execute();
+            $stmt2->close();
+
+            $conexion->commit();
             $mensaje = "Venta eliminada correctamente.";
-            $stmt->close();
         } catch (Exception $e) {
+            $conexion->rollback();
             $mensaje = "Error al eliminar la venta: " . $e->getMessage();
         }
     }
-    
 }
 ?>
 <!DOCTYPE html>
@@ -174,10 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transition: background-color 0.3s;
         }
 
-        .btn-eliminar:hover {
-            background-color:rgb(49, 114, 52);
-        }
-
         .mensaje {
             margin-top: 20px;
             padding: 10px;
@@ -258,31 +253,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </table>
     <?php } ?>
 
-    <h2>Mostrar Ventas con Puntos</h2>
-    <form method="POST">
-        <button type="submit" name="mostrarVentasConPuntos">Mostrar Ventas con Puntos</button>
-    </form>
-
-    <?php if (!empty($ventasConPuntos)) { ?>
-        <h3>Resultados de Ventas con Puntos:</h3>
-        <table>
-            <tr>
-                <th>ID Venta</th>
-                <th>Puntos</th>
-                <th>Fecha Asignación</th>
-                <th>Fecha Expiración</th>
-            </tr>
-            <?php foreach ($ventasConPuntos as $venta) { ?>
-                <tr>
-                    <td><?= $venta['ID_Venta'] ?></td>
-                    <td><?= $venta['Puntos'] ?></td>
-                    <td><?= $venta['Fecha_Asignacion'] ?></td>
-                    <td><?= $venta['Fecha_Expiracion'] ?></td>
-                </tr>
-            <?php } ?>
-        </table>
-    <?php } ?>
-
     <h2>Eliminar Venta</h2>
     <form method="POST">
         <label for="ventaID">ID de la Venta:</label>
@@ -291,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <?php if ($mensaje) { ?>
-        <div class="mensaje <?= isset($e) ? 'success' : '' ?>">
+        <div class="mensaje <?= str_contains($mensaje, 'correctamente') ? 'success' : '' ?>">
             <p><?= $mensaje ?></p>
         </div>
     <?php } ?>

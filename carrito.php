@@ -1,150 +1,173 @@
 <?php
-// Conexión a la base de datos
+// Iniciar sesión para acceder al correo del usuario
+session_start();
+require 'PHPMailer/src/PHPMailer.php';
+require 'PHPMailer/src/SMTP.php';
+require 'PHPMailer/src/Exception.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 $conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
 
 if ($conexion->connect_error) {
     die("Conexión fallida: " . $conexion->connect_error);
 }
 
-// Variable para el descuento
-$descuento = 0;
-$totalVenta = 0;
 $mensaje = '';
+$totalVenta = 0;
+$iva = 0.16; // IVA 16%
 
-// Procesar eliminación de producto del carrito
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['eliminarProducto'])) {
     $productoID = intval($_POST['ProductoID']);
 
-    $stmt = $conexion->prepare("CALL eliminarDelCarrito(?)");
+    // Obtener cantidad del carrito
+    $stmt = $conexion->prepare("SELECT Cantidad FROM carrito WHERE ProductoID = ?");
     $stmt->bind_param("i", $productoID);
-    if ($stmt->execute()) {
-        $mensaje = "Producto eliminado del carrito.";
-    } else {
-        $mensaje = "Error al eliminar el producto.";
-    }
-    $stmt->close();
+    $stmt->execute();
+    $stmt->bind_result($cantidadEnCarrito);
+    if ($stmt->fetch()) {
+        $stmt->close();
 
-    // Recargar la página para reflejar los cambios
+        // Devolver stock
+        $stmt = $conexion->prepare("UPDATE productos SET Stock = Stock + ? WHERE ProductoID = ?");
+        $stmt->bind_param("ii", $cantidadEnCarrito, $productoID);
+        $stmt->execute();
+        $stmt->close();
+
+        // Eliminar del carrito
+        $stmt = $conexion->prepare("DELETE FROM carrito WHERE ProductoID = ?");
+        $stmt->bind_param("i", $productoID);
+        $stmt->execute();
+        $stmt->close();
+
+        $mensaje = "Producto eliminado del carrito y devuelto al stock.";
+    } else {
+        $stmt->close();
+        $mensaje = "No se encontró el producto en el carrito.";
+    }
+
     echo "<script>window.location.href = window.location.href;</script>";
     exit;
 }
 
-// Si se realiza el pago y se ingresa el ID de la venta pasada
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ventaPasadaId']) && !empty($_POST['ventaPasadaId'])) {
-    $ventaPasadaId = intval($_POST['ventaPasadaId']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['realizarVenta'])) {
+    // Obtener correo del usuario desde la sesión
+    $correoCliente = isset($_SESSION['correo']) ? $_SESSION['correo'] : 'cliente@ejemplo.com'; // Valor por defecto si no está en sesión
 
-    // Verificar si la venta pasada existe y obtener los puntos
-    $stmt = $conexion->prepare("SELECT Puntos FROM puntos WHERE id_venta = ?");
-    $stmt->bind_param("i", $ventaPasadaId);
-    $stmt->execute();
-    $stmt->store_result();
-
-    // Comprobar si se encontraron filas
-    if ($stmt->num_rows > 0) {
-        $stmt->bind_result($puntos);
-        $stmt->fetch();
-
-        // Usar la función MySQL para calcular el descuento
-        $stmt2 = $conexion->prepare("SELECT calcular_descuento(?) AS descuento");
-        $stmt2->bind_param("i", $puntos);
-        $stmt2->execute();
-        $stmt2->bind_result($descuento);
-        $stmt2->fetch();
-        $stmt2->close();
-
-        // Eliminar los puntos de la venta pasada
-        $stmt3 = $conexion->prepare("DELETE FROM puntos WHERE id_venta = ?");
-        $stmt3->bind_param("i", $ventaPasadaId);
-        $stmt3->execute();
-        $stmt3->close();
-
-        $mensaje = "Descuento aplicado con éxito. Descuento: $descuento%.";
-    } else {
-        // Si no se encontraron filas, el ID no existe o no tiene puntos
-        echo "<script>alert('El ID ingresado ($ventaPasadaId) no existe o no tiene puntos.');</script>";
-    }
-
-    $stmt->close();
-}
-
-
-
-// Si se realiza la compra
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ventaPasadaId'])) {
-    // Llamar al procedimiento almacenado para obtener los productos del carrito
-    $stmt = $conexion->prepare("CALL obtener_productos_carrito()");
-    $stmt->execute();
-    $carritoResult = $stmt->get_result();
-
-    // Liberar cualquier resultado anterior (en caso de que haya más de un conjunto de resultados)
-    while ($conexion->more_results()) {
-        $conexion->next_result();
-    }
+    $carritoResult = $conexion->query("SELECT c.ProductoID, p.Nombre, p.Precio, c.Cantidad, p.foto 
+        FROM carrito c 
+        JOIN productos p ON c.ProductoID = p.ProductoID");
 
     if ($carritoResult->num_rows > 0) {
-        // Iniciar transacción para asegurar la atomicidad
         $conexion->begin_transaction();
-
         try {
-            // Asegurarse de que la fecha tenga el formato adecuado (YYYY-MM-DD)
             $fechaVenta = date('Y-m-d');
-            // Preparar y ejecutar el procedimiento almacenado
-            $stmt = $conexion->prepare("CALL registrar_venta(?, ?, @ventaId)");
-            $stmt->bind_param("sd", $fechaVenta, $totalVenta);
+            $stmt = $conexion->prepare("INSERT INTO ventas (Fecha, Total) VALUES (?, 0)");
+            $stmt->bind_param("s", $fechaVenta);
             $stmt->execute();
-            
-            // Obtener el ID de la venta recién insertada
-            $result = $conexion->query("SELECT @ventaId AS ventaId");
-            if ($result && $row = $result->fetch_assoc()) {
-                $ventaId = $row['ventaId'];
-            }
-            
+            $ventaId = $stmt->insert_id;
             $stmt->close();
 
-            // Insertar los productos vendidos en DetalleVentas
             while ($row = $carritoResult->fetch_assoc()) {
                 $productoId = $row['ProductoID'];
-                $nombre = $row['Nombre'];
                 $precio = $row['Precio'];
                 $cantidad = $row['Cantidad'];
                 $foto = $row['foto'];
                 $subtotal = $precio * $cantidad;
 
-                // Llamar al procedimiento almacenado para insertar en DetalleVentas
-                $stmt = $conexion->prepare("CALL insertar_detalle_venta(?, ?, ?, ?, ?)");
+                $stmt = $conexion->prepare("INSERT INTO DetalleVentas (id_venta, ProductoID, foto, Cantidad, Subtotal) VALUES (?, ?, ?, ?, ?)");
                 $stmt->bind_param("iisid", $ventaId, $productoId, $foto, $cantidad, $subtotal);
                 $stmt->execute();
                 $stmt->close();
             }
 
-            // Calcular el total de la venta usando la función MySQL
-            $stmt4 = $conexion->prepare("SELECT calcular_total_venta(?) AS totalVenta");
-            $stmt4->bind_param("i", $ventaId);  // Asegúrate de usar la variable PHP $ventaId
-            $stmt4->execute();
-            $stmt4->bind_result($totalVenta);
-            $stmt4->fetch();
-            $stmt4->close();
+            $result = $conexion->query("SELECT SUM(Subtotal) AS total FROM DetalleVentas WHERE id_venta = $ventaId");
+            $row = $result->fetch_assoc();
+            $totalVenta = $row['total'];
 
-            // Aplicar descuento basado en los puntos
-            $totalVenta -= $totalVenta * ($descuento / 100);
+            // Calcular IVA
+            $totalConIva = $totalVenta * (1 + $iva); // Total + IVA
 
-            // Llamar al procedimiento almacenado para actualizar el total de la venta
-            $stmt = $conexion->prepare("CALL actualizar_total_venta(?, ?)");
-            $stmt->bind_param("id", $ventaId, $totalVenta);  
+            $stmt = $conexion->prepare("UPDATE ventas SET Total = ? WHERE id_venta = ?");
+            $stmt->bind_param("di", $totalConIva, $ventaId);
             $stmt->execute();
             $stmt->close();
 
-            // Llamar al procedimiento almacenado para eliminar los productos del carrito
-            $stmt = $conexion->prepare("CALL eliminar_productos_carrito()");
-            $stmt->execute();
-            $stmt->close();
+            $conexion->query("DELETE FROM carrito");
 
-            // Confirmar la transacción
             $conexion->commit();
+            $mensaje = "Compra realizada con éxito. Total a pagar (con IVA): $" . number_format($totalConIva, 2);
 
-            $mensaje = "Compra realizada con éxito. Total a pagar: $" . number_format($totalVenta, 2);
+            // Enviar correo al cliente
+            $mail = new PHPMailer(true);
+            try {
+                // Configuración del servidor SMTP de Gmail
+                $mail->isSMTP();
+                $mail->Host = 'smtp.gmail.com';
+                $mail->SMTPAuth = true;
+                $mail->Username = 'lia.abril.azamar.hernandez@gmail.com'; // Tu correo de Gmail
+                $mail->Password = 'kzcg read pgkn xehu'; // Tu contraseña de Gmail o contraseña de aplicación
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port = 587;
+
+                // Remitente y destinatario
+                $mail->setFrom('lia_Abril', 'Computec');
+                $mail->addAddress($correoCliente); // Dirección del cliente
+
+                // Iniciar el cuerpo del correo
+                $mail->isHTML(true);
+                $mail->Subject = 'Detalles de tu compra';
+                $mail->Body = "Gracias por tu compra. Aquí están los detalles de tu compra:<br><br>";
+
+                // Consultar los productos comprados en la venta
+                $detalleVentasResult = $conexion->query("
+                    SELECT dv.Cantidad, p.Nombre, p.Precio 
+                    FROM detalleventas dv
+                    JOIN productos p ON dv.ProductoID = p.ProductoID
+                    WHERE dv.id_venta = '$ventaId'");
+
+                // Verificamos si hay productos en la venta
+                if ($detalleVentasResult->num_rows > 0) {
+                    // Crear la tabla de productos comprados
+                    $mail->Body .= "<h3>Productos comprados:</h3>";
+                    $mail->Body .= "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>";
+                    $mail->Body .= "<tr><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Subtotal</th></tr>";
+
+                    // Iteramos sobre los productos y agregamos cada uno a la tabla
+                    while ($row = $detalleVentasResult->fetch_assoc()) {
+                        $subtotal = $row['Cantidad'] * $row['Precio'];
+                        $mail->Body .= "<tr>";
+                        $mail->Body .= "<td>" . $row['Nombre'] . "</td>";
+                        $mail->Body .= "<td>" . $row['Cantidad'] . "</td>";
+                        $mail->Body .= "<td>$" . number_format($row['Precio'], 2) . "</td>";
+                        $mail->Body .= "<td>$" . number_format($subtotal, 2) . "</td>";
+                        $mail->Body .= "</tr>";
+                    }
+
+                    // Cerrar la tabla
+                    $mail->Body .= "</table><br><br>";
+                } else {
+                    // Si no hay productos en DetalleVentas para la venta
+                    $mail->Body .= "No se encontraron productos para esta venta.<br><br>";
+                }
+
+                // Calcular el IVA y el total con IVA
+                $ivaAmount = $totalVenta * $iva;
+                $totalConIva = $totalVenta + $ivaAmount;
+
+                // Agregar el total, IVA y total con IVA
+                $mail->Body .= "Total: $" . number_format($totalVenta, 2) . "<br>";
+                $mail->Body .= "IVA (16%): $" . number_format($ivaAmount, 2) . "<br>";
+                $mail->Body .= "Total con IVA: $" . number_format($totalConIva, 2);
+
+                // Enviar el correo
+                $mail->send();
+            } catch (Exception $e) {
+                $mensaje .= "<br> Error al enviar el correo: " . $mail->ErrorInfo;
+            }
+
         } catch (Exception $e) {
-            // En caso de error, revertir la transacción
             $conexion->rollback();
             $mensaje = "Error en la compra: " . $e->getMessage();
         }
@@ -152,31 +175,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ventaPasadaId'])) {
         $mensaje = "Ingrese por lo menos un producto";
     }
 }
-
-
-// Inicializar la variable $totalCarrito
-$totalCarrito = 0;
-// Llamar al procedimiento almacenado para obtener los productos del carrito
-$stmt = $conexion->prepare("CALL obtener_productos_carrito()");
-$stmt->execute();
-$result = $stmt->get_result();  // Obtener los resultados del procedimiento 
-$stmt->close();
 ?>
+
+
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carrito de Compras</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        /* Estilos generales */
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f4f4f4;
             margin: 0;
-            padding: 0;
         }
 
         .contenedor {
@@ -188,9 +201,9 @@ $stmt->close();
         }
 
         h1 {
-            text-align: left;
+            text-align: center;
             color: #2c3e50;
-            font-size: 24px;
+            font-size: 32px;
             margin-bottom: 20px;
         }
 
@@ -205,11 +218,6 @@ $stmt->close();
             margin-bottom: 20px;
         }
 
-        .btn-principal:hover {
-            background-color: #2ecc71;
-        }
-
-        /* Estilos de la tabla */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -245,7 +253,6 @@ $stmt->close();
             font-weight: bold;
         }
 
-        /* Estilo para mensajes */
         .mensaje-compra {
             background-color: #f9f9f9;
             padding: 10px;
@@ -253,30 +260,16 @@ $stmt->close();
             margin-bottom: 20px;
         }
 
-        /* Estilos del formulario para ID de venta pasada y el botón */
         .form-venta {
+            text-align: center;
             margin-top: 20px;
-            background-color: #f2f2f2;
-            padding: 15px;
-            border-radius: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .form-venta input[type="number"] {
-            padding: 8px;
-            font-size: 16px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            width: 50%;
         }
 
         .boton-pagar {
             background-color: #27ae60;
             color: white;
-            padding: 10px 20px;
-            font-size: 16px;
+            padding: 10px 25px;
+            font-size: 18px;
             border-radius: 5px;
             border: none;
             cursor: pointer;
@@ -285,20 +278,12 @@ $stmt->close();
         .boton-pagar:hover {
             background-color: #2ecc71;
         }
-        h1 {
-            text-align: center;  
-            color: #2c3e50;
-            font-size: 32px;  
-            margin-bottom: 20px;
-        }
-
     </style>
 </head>
 <body>
 
 <div class="contenedor">
     <a href="producto.php" class="btn-principal">Productos</a>
-
     <h1>Carrito de Compras</h1>
 
     <?php if ($mensaje): ?>
@@ -307,7 +292,6 @@ $stmt->close();
         </div>
     <?php endif; ?>
 
-    <!-- Tabla de productos del carrito -->
     <table>
         <thead>
             <tr>
@@ -320,58 +304,69 @@ $stmt->close();
         </thead>
         <tbody>
             <?php
-            // Conexión a la base de datos y obtener los productos del carrito
-            $conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
-            if ($conexion->connect_error) {
-                die("Conexión fallida: " . $conexion->connect_error);
-            }
+            $carritoResult = $conexion->query("SELECT c.ProductoID, p.Nombre, p.Precio, c.Cantidad, p.foto 
+                FROM carrito c 
+                JOIN productos p ON c.ProductoID = p.ProductoID");
 
-            $stmt = $conexion->prepare("CALL obtener_productos_carrito()");
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if ($result->num_rows > 0) {
-                $totalCarrito = 0;
-                while ($row = $result->fetch_assoc()) {
+            if ($carritoResult->num_rows > 0) {
+                while ($row = $carritoResult->fetch_assoc()) {
                     $subtotal = $row['Precio'] * $row['Cantidad'];
-                    $totalCarrito += $subtotal;
-                    ?>
-                    <tr>
-                        <td><img src="<?php echo htmlspecialchars($row['foto']); ?>" alt="<?php echo htmlspecialchars($row['Nombre']); ?>" width="100"></td>
-                        <td><?php echo htmlspecialchars($row['Nombre']); ?></td>
-                        <td><?php echo htmlspecialchars($row['Cantidad']); ?></td>
-                        <td>$<?php echo number_format($subtotal, 2); ?></td>
-                        <td>
-                            <!-- Formulario para eliminar el producto -->
-                            <form method="POST" action="">
-                                <input type="hidden" name="ProductoID" value="<?php echo $row['ProductoID']; ?>">
-                                <button type="submit" name="eliminarProducto" class="boton-eliminar">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    <?php
+                    echo "<tr>";
+                    echo "<td><img src='{$row['foto']}' alt='Imagen Producto' width='50'></td>";
+                    echo "<td>{$row['Nombre']}</td>";
+                    echo "<td>{$row['Cantidad']}</td>";
+                    echo "<td>$" . number_format($subtotal, 2) . "</td>";
+                    echo "<td><form method='POST'>
+                            <input type='hidden' name='ProductoID' value='{$row['ProductoID']}'>
+                            <button type='submit' name='eliminarProducto' class='boton-eliminar'>Eliminar</button>
+                          </form></td>";
+                    echo "</tr>";
                 }
             } else {
                 echo "<tr><td colspan='5'>No hay productos en el carrito.</td></tr>";
             }
-
-            $stmt->close();
-            $conexion->close();
             ?>
         </tbody>
     </table>
 
-    <p class="total">Total a pagar: $<?php echo number_format($totalCarrito, 2); ?></p>
+    <div class="total">
+    <p>Total: $
+        <?php
+        $totalVenta = 0;
+        $carritoResult = $conexion->query("SELECT c.Cantidad, p.Precio FROM carrito c 
+            JOIN productos p ON c.ProductoID = p.ProductoID");
 
-    <!-- Formulario para ingresar ID de venta pasada y realizar la venta -->
-    <div class="form-venta">
-        <form method="POST" action="">
-            <label for="ventaPasadaId">ID de venta pasada (para aplicar descuento):</label>
-            <input type="number" id="ventaPasadaId" name="ventaPasadaId" placeholder="Ingresa ID de la venta pasada">
-            <button type="submit" class="boton-pagar">Realizar Venta</button>
-        </form>
+        while ($row = $carritoResult->fetch_assoc()) {
+            $totalVenta += $row['Cantidad'] * $row['Precio'];
+        }
+        echo number_format($totalVenta, 2);
+        ?>
+    </p>
+
+    <p>IVA (16%): $
+        <?php
+        $ivaAmount = $totalVenta * $iva;
+        echo number_format($ivaAmount, 2);
+        ?>
+    </p>
+
+    <p>Total con IVA: $
+        <?php
+        $totalConIva = $totalVenta + $ivaAmount;
+        echo number_format($totalConIva, 2);
+        ?>
+    </p>
     </div>
+
+
+    <form class="form-venta" method="POST">
+        <button type="submit" name="realizarVenta" class="boton-pagar">Realizar Compra</button>
+    </form>
 </div>
 
 </body>
 </html>
+
+<?php
+$conexion->close();
+?>

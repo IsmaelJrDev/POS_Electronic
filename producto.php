@@ -1,4 +1,12 @@
 <?php
+session_start();
+if (!isset($_SESSION['id_usuario'])) {
+    header("Location: secion.php");
+    exit;
+}
+?>
+<?php
+
 // Conexión a la base de datos
 $conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
 
@@ -17,36 +25,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['productoId']) && isse
     }
 
     // Verificar si hay suficiente stock
-    $stmt = $conexion->prepare("CALL verificarStock(?)");
+    $stmt = $conexion->prepare("SELECT Stock FROM productos WHERE ProductoID = ?");
     $stmt->bind_param("i", $productoId);
     $stmt->execute();
-    
-    // Recuperar el resultado del procedimiento almacenado
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
-    $stockDisponible = $row['stockDisponible'];
-    
+    $stockDisponible = $row['Stock'];
     $stmt->close();
-    
+
     // Verificar si la cantidad solicitada excede el stock disponible
     if ($cantidad > $stockDisponible) {
         echo "No hay suficiente stock disponible. Stock actual: $stockDisponible.";
         exit;
     }
 
-
     // Agregar al carrito
-    $stmt = $conexion->prepare("CALL agregarAlCarrito(?, ?)");
+    $stmt = $conexion->prepare("INSERT INTO Carrito (ProductoID, Cantidad) VALUES (?, ?)");
     $stmt->bind_param("ii", $productoId, $cantidad);
     $stmt->execute();
     $stmt->close();
 
-    echo "Producto agregado al carrito.";
+    // Reducir el stock en la base de datos
+    $nuevoStock = $stockDisponible - $cantidad;
+    $stmt = $conexion->prepare("UPDATE productos SET Stock = ? WHERE ProductoID = ?");
+    $stmt->bind_param("ii", $nuevoStock, $productoId);
+    $stmt->execute();
+    $stmt->close();
+
+    echo "Producto agregado al carrito. Stock actualizado.";
     exit;
 }
 
-// Llamar al procedimiento almacenado para obtener los productos
-$sql = "CALL obtenerProductos()";
+// Obtener productos
+$sql = "SELECT ProductoID, Nombre, Precio, Stock, foto FROM productos";
 $result = $conexion->query($sql);
 
 if (!$result) {
@@ -192,7 +203,7 @@ if (!$result) {
 <body>
     <!-- Barra superior -->
     <div class="barra-superior">
-        <a href="index.php">
+        <a href="inicio.php">
             <button class="boton">Volver al Inicio</button>
         </a>
         <a href="carrito.php">

@@ -1,4 +1,6 @@
 <?php
+session_start(); // Inicia la sesión para acceder a las variables de sesión
+
 // Conexión a la base de datos si es necesario
 $conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
 
