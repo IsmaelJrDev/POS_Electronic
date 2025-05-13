@@ -4,59 +4,13 @@ if (!isset($_SESSION['id_usuario'])) {
     header("Location: secion.php");
     exit;
 }
-?>
-<?php
 
-// Conexión a la base de datos
 $conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
 
 if ($conexion->connect_error) {
     die("Conexión fallida: " . $conexion->connect_error);
 }
 
-// Función para agregar al carrito
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['productoId']) && isset($_POST['cantidad'])) {
-    $productoId = intval($_POST['productoId']);
-    $cantidad = intval($_POST['cantidad']);
-
-    if ($cantidad <= 0) {
-        echo "La cantidad debe ser un número mayor a 0.";
-        exit;
-    }
-
-    // Verificar si hay suficiente stock
-    $stmt = $conexion->prepare("SELECT Stock FROM productos WHERE ProductoID = ?");
-    $stmt->bind_param("i", $productoId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    $stockDisponible = $row['Stock'];
-    $stmt->close();
-
-    // Verificar si la cantidad solicitada excede el stock disponible
-    if ($cantidad > $stockDisponible) {
-        echo "No hay suficiente stock disponible. Stock actual: $stockDisponible.";
-        exit;
-    }
-
-    // Agregar al carrito
-    $stmt = $conexion->prepare("INSERT INTO Carrito (ProductoID, Cantidad) VALUES (?, ?)");
-    $stmt->bind_param("ii", $productoId, $cantidad);
-    $stmt->execute();
-    $stmt->close();
-
-    // Reducir el stock en la base de datos
-    $nuevoStock = $stockDisponible - $cantidad;
-    $stmt = $conexion->prepare("UPDATE productos SET Stock = ? WHERE ProductoID = ?");
-    $stmt->bind_param("ii", $nuevoStock, $productoId);
-    $stmt->execute();
-    $stmt->close();
-
-    echo "Producto agregado al carrito. Stock actualizado.";
-    exit;
-}
-
-// Obtener productos
 $sql = "SELECT ProductoID, Nombre, Precio, Stock, foto FROM productos";
 $result = $conexion->query($sql);
 
@@ -70,10 +24,8 @@ if (!$result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema POS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>Componentes de Computadoras</title>
     <style>
-        /* Estilos generales */
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f8f9fa;
@@ -95,9 +47,8 @@ if (!$result) {
             padding: 20px;
         }
 
-        /* Barra superior */
         .barra-superior {
-            background-color: #28a745;
+            background-color: #4CAF50;
             padding: 15px 0;
             display: flex;
             justify-content: center;
@@ -111,8 +62,8 @@ if (!$result) {
 
         .boton {
             background-color: #fff;
-            color: #28a745;
-            border: 2px solid #28a745;
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
             padding: 10px 20px;
             font-size: 1rem;
             font-weight: 500;
@@ -122,11 +73,10 @@ if (!$result) {
         }
 
         .boton:hover {
-            background-color:rgb(24, 80, 37);
+            background-color: #388E3C;
             color: #fff;
         }
 
-        /* Productos */
         .productos-container {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -168,7 +118,7 @@ if (!$result) {
         }
 
         .agregar-carrito {
-            background-color: #28a745;
+            background-color: #4CAF50;
             color: #fff;
             border: none;
             padding: 10px 20px;
@@ -179,29 +129,11 @@ if (!$result) {
         }
 
         .agregar-carrito:hover {
-            background-color:rgb(23, 89, 37);
-        }
-
-        /* Estilo responsive */
-        @media (max-width: 768px) {
-            .productos-container {
-                grid-template-columns: 1fr;
-            }
-
-            .barra-superior {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .boton {
-                width: 90%;
-                text-align: center;
-            }
+            background-color: #388E3C;
         }
     </style>
 </head>
 <body>
-    <!-- Barra superior -->
     <div class="barra-superior">
         <a href="inicio.php">
             <button class="boton">Volver al Inicio</button>
@@ -212,7 +144,7 @@ if (!$result) {
     </div>
 
     <div class="contenedor">
-        <h1>Productos Disponibles</h1>
+        <h1>Componentes Disponibles</h1>
         <div class="productos-container">
             <?php
             if ($result->num_rows > 0) {
@@ -226,31 +158,11 @@ if (!$result) {
                     echo "</div>";
                 }
             } else {
-                echo "<p>No se encontraron productos.</p>";
+                echo "<p>No se encontraron componentes.</p>";
             }
             ?>
         </div>
     </div>
-
-    <script>
-        document.querySelectorAll('.agregar-carrito').forEach(button => {
-            button.addEventListener('click', function() {
-                var productoId = this.getAttribute('data-id');
-                var cantidad = prompt("Ingresa la cantidad que deseas comprar:");
-                if (!cantidad || isNaN(cantidad) || cantidad <= 0) {
-                    alert("Por favor, ingresa una cantidad válida (mayor a 0).");
-                    return;
-                }
-                var xhttp = new XMLHttpRequest();
-                xhttp.open("POST", "", true);
-                xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-                xhttp.send("productoId=" + productoId + "&cantidad=" + cantidad);
-                xhttp.onload = function() {
-                    alert(xhttp.responseText);
-                };
-            });
-        });
-    </script>
 </body>
 </html>
 

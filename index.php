@@ -1,7 +1,6 @@
 <?php
-session_start(); // Inicia la sesión para acceder a las variables de sesión
+session_start();
 
-// Conexión a la base de datos si es necesario
 $conexion = new mysqli("localhost", "root", "root", "SistemaPOS");
 
 if ($conexion->connect_error) {
@@ -14,7 +13,7 @@ if ($conexion->connect_error) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Página Principal - Sistema POS</title>
+    <title>Página Principal - Componentes de Computadoras</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -59,7 +58,6 @@ if ($conexion->connect_error) {
             padding: 10px 20px;
             transition: background-color 0.3s;
         }
-
 
         .container {
             max-width: 1100px;
@@ -113,22 +111,22 @@ if ($conexion->connect_error) {
 <body>
 
     <header>
-        <h1>Tienda las pelonas</h1>
+        <h1>Tienda de Componentes de Computadoras</h1>
     </header>
 
     <div class="container">
         <div class="links-container">
             <div class="link-card">
-                <a href="cambios.php">Opciones multiples</a>
-                <p>Funciones multiples que te ayudan a la creacion, eliminacion, modificacion de los productos</p>
+                <a href="cambios.php">Gestión de Componentes</a>
+                <p>Administra los componentes: creación, eliminación y modificación.</p>
             </div>
             <div class="link-card">
-                <a href="producto.php">Elija sus productos</a>
-                <p>Agregue los productos a comprar</p>
+                <a href="producto.php">Explorar Componentes</a>
+                <p>Agrega componentes al carrito de compras.</p>
             </div>
             <div class="link-card">
-                <a href="Venta.php">Informacion sobre las Ventas</a>
-                <p>Consulta el historial de ventas</p>
+                <a href="Venta.php">Historial de Ventas</a>
+                <p>Consulta las ventas realizadas.</p>
             </div>
         </div>
     </div>
