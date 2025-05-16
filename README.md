@@ -1,108 +1,84 @@
-# POS_Electronic - Sistema Punto de Venta
+# 🛒 Punto de Venta Web (Vanilla JS, PHP, MySQL, MVC)
 
-Este es un sistema de punto de venta (POS) desarrollado con tecnologías modernas para ofrecer un ambiente seguro, escalable y fácil de mantener. El proyecto utiliza:
+Este proyecto es un sistema de punto de venta web desarrollado con **HTML, CSS, JavaScript, PHP y MySQL** bajo el patrón de arquitectura **MVC (Modelo-Vista-Controlador)**.
 
-- **Frontend:** Vite + Vanilla JavaScript + TailwindCSS + SweetAlert
-- **Backend:** Node.js + Express + MySQL
-- **Base de datos:** MySQL 8.0
-- **Docker:** Para orquestar y contenerizar toda la aplicación (frontend, backend, base de datos y phpMyAdmin)
+✅ Login interactivo sin recarga  
+✅ Separación clara de lógica (MVC)  
+✅ Compatible con servidores locales como XAMPP
 
----
+## 🚀 Características principales
 
-## 🔧 Requisitos
+-   Login con validación de usuario y contraseña
+-   Redirección automática por rol (`admin` o `empleado`)
+-   Comunicación frontend-backend con `fetch()`
+-   Estructura limpia tipo MVC
 
-- Docker y Docker Compose instalados
-- Node.js (para desarrollo local, opcional si usas Docker)
+## 📂 Estructura del proyecto
 
----
+```
+/pos-system/
+├── /model/           → Lógica de acceso a datos
+├── /view/            → Vistas HTML del sistema
+├── /controller/      → Manejo de la lógica y control de flujo
+├── /assets/          → Archivos estáticos (CSS, JS, imágenes)
+├── /config/          → Conexión a la base de datos
+├── index.php         → Entrada (opcional)
+└── README.md         → Este archivo
+```
 
-## 🚀 Instalación y uso
+## 🛠️ Tecnologías
+
+-   HTML5 / CSS3
+-   JavaScript (Vanilla)
+-   PHP (sin frameworks)
+-   MySQL
+-   XAMPP o similar
+
+## 🗃️ Requisitos
+
+-   PHP 7.4+
+-   MySQL/MariaDB
+-   Navegador moderno
+-   Servidor local (XAMPP, WAMP, etc.)
+
+## 🔧 Configuración del entorno
+
+Este proyecto usa un archivo `.env` para almacenar las credenciales de la base de datos.  
+Crea un archivo `.env` en la raíz del proyecto con el siguiente contenido:
+
+```env
+DB_HOST=localhost
+DB_NAME=punto_venta
+DB_USER=root
+DB_PASS=
+```
+
+> ⚠️ El archivo `.env` **ya está excluido del repositorio** por medio de `.gitignore`.
+
+El archivo `config/database.php` lee estas variables automáticamente usando `parse_ini_file()` para establecer la conexión.
+
+## ⚙️ Instalación
 
 1. Clona el repositorio:
+    ```bash
+    git clone https://github.com/tu_usuario/pos-system.git
+    ```
+2. Importa el archivo `.sql` (si lo generas) a tu base de datos en **phpMyAdmin**
+3. Crea tu `.env` con los datos de conexión
+4. Inicia tu servidor (XAMPP o similar) y abre `/view/login.html`
 
-   ```bash
-   git clone https://github.com/tuusuario/d-mart.git
-   cd d-mart
-   ```
+## 🔐 Credenciales de ejemplo
 
-2. Crea el archivo `.env` en la carpeta `backend/` con las variables necesarias:
+| Usuario | Contraseña | Rol      |
+| ------- | ---------- | -------- |
+| admin   | admin123   | admin    |
+| juan    | juan123    | empleado |
 
-   ```env
-   MYSQL_HOST=mysql
-   MYSQL_USER=root
-   MYSQL_PASSWORD=12345
-   MYSQL_DATABASE=d_mart
-   PORT=3000
-   ```
+## 📌 Estado actual
 
-3. Construye y levanta los contenedores con Docker Compose:
-
-   ```bash
-   docker-compose up --build
-   ```
-
-4. Accede a:
-
-   - **Frontend (Vite):** http://localhost:5173
-   - **Backend (API):** http://localhost:3000/api
-   - **phpMyAdmin:** http://localhost:8080
-
----
-
-## 🗂 Estructura del proyecto
-
-```
-d-mart/
-├── backend/       # Código backend (Express)
-├── frontend/      # Código frontend (Vite + JS + Tailwind)
-├── docker-compose.yml
-├── .gitignore
-└── README.md
-```
-
----
-
-## 🛠 Tecnologías usadas
-
-- [Node.js](https://nodejs.org/)
-- [Express](https://expressjs.com/)
-- [MySQL](https://www.mysql.com/)
-- [Vite](https://vitejs.dev/)
-- [TailwindCSS](https://tailwindcss.com/)
-- [Docker](https://www.docker.com/)
-- [phpMyAdmin](https://www.phpmyadmin.net/)
-
----
-
-## 🔐 Seguridad y buenas prácticas
-
-- Las credenciales de la base de datos están en un archivo `.env` que **no debe subirse a GitHub**.
-- El backend expone APIs para que el frontend pueda interactuar con la base de datos de forma segura.
-- El frontend **nunca** se conecta directamente a la base de datos.
-
----
-
-## 📈 Mejoras futuras
-
-- Implementar autenticación con JWT.
-- Añadir roles de usuario (empleado, administrador).
-- Añadir módulos para gestión de inventarios y reportes.
-- Mejorar la interfaz con más funcionalidades.
-
----
-
-## 🤝 Contribuciones
-
-¡Las contribuciones son bienvenidas! Haz un fork, crea tu rama, y abre un pull request.
-
----
+✅ Login básico  
+⏳ Próximo: módulo de ventas, productos, tickets y reportes
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia MIT.
-
----
-
----
-
-**Dudas o sugerencias?** Contacta conmigo vía email o abre un issue.
+Este proyecto es de código abierto bajo la licencia MIT.
