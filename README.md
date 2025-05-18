@@ -43,15 +43,7 @@ Este proyecto es un sistema de punto de venta web desarrollado con **HTML, CSS, 
 
 ## 🔧 Configuración del entorno
 
-Este proyecto usa un archivo `.env` para almacenar las credenciales de la base de datos.  
-Crea un archivo `.env` en la raíz del proyecto con el siguiente contenido:
-
-```env
-DB_HOST=localhost
-DB_NAME=punto_venta
-DB_USER=root
-DB_PASS=
-```
+Este proyecto usa un archivo `.env` para almacenar las credenciales de la base de datos.
 
 > ⚠️ El archivo `.env` **ya está excluido del repositorio** por medio de `.gitignore`.
 
@@ -66,18 +58,6 @@ El archivo `config/database.php` lee estas variables automáticamente usando `pa
 2. Importa el archivo `.sql` (si lo generas) a tu base de datos en **phpMyAdmin**
 3. Crea tu `.env` con los datos de conexión
 4. Inicia tu servidor (XAMPP o similar) y abre `/view/login.html`
-
-## 🔐 Credenciales de ejemplo
-
-| Usuario | Contraseña | Rol      |
-| ------- | ---------- | -------- |
-| admin   | admin123   | admin    |
-| juan    | juan123    | empleado |
-
-## 📌 Estado actual
-
-✅ Login básico  
-⏳ Próximo: módulo de ventas, productos, tickets y reportes
 
 ## 📄 Licencia
 

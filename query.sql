@@ -43,3 +43,26 @@ VALUES
 
 ('Fuente de Poder EVGA 600W', '80+ White, excelente para PCs de gama media.', 899.00, 12, 'evga600w.jpg', 'Fuente de Poder', 'EVGA', '600W White');
 
+-- Tabla de ventas
+CREATE TABLE IF NOT EXISTS ventas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    total DECIMAL(10,2) NOT NULL,
+    contacto VARCHAR(100) NOT NULL
+);
+
+-- Tabla de detalle de ventas
+CREATE TABLE IF NOT EXISTS detalle_ventas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    venta_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id),
+    FOREIGN KEY (producto_id) REFERENCES productos(id)
+);
+
+-- Insertar fecha y teléfono en detalle_ventas
+ALTER TABLE detalle_ventas
+    ADD COLUMN fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN telefono VARCHAR(20);

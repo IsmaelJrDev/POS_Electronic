@@ -7,19 +7,16 @@ document.addEventListener("DOMContentLoaded", () => {
         .then((res) => res.json())
         .then((data) => {
             productos = data;
-            mostrarCategorias();
-            mostrarProductos(productos);
+            cargarCategorias();
+            aplicarFiltros(); // Mostrar productos filtrados desde el inicio
         });
 
-    // Buscador
     document
         .getElementById("buscador")
-        .addEventListener("input", filtrarProductos);
-    // Filtro por categoría
+        .addEventListener("input", aplicarFiltros);
     document
         .getElementById("categoriaFiltro")
-        .addEventListener("change", filtrarProductos);
-    // Carrito
+        .addEventListener("change", aplicarFiltros);
     document
         .getElementById("verCarrito")
         .addEventListener("click", mostrarCarrito);
@@ -31,12 +28,11 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("modalCarrito").style.display = "none";
         }
     };
-});
-
-document.getElementById("cerrarSesion").addEventListener("click", function () {
-    // Aquí puedes limpiar el almacenamiento local, cookies o hacer una petición al backend para cerrar sesión
-    // Por ahora, solo redirige al login
-    window.location.href = "../../view/login.html";
+    document
+        .getElementById("cerrarSesion")
+        .addEventListener("click", function () {
+            window.location.href = "../../view/login.html";
+        });
 });
 
 // Mostrar productos en el grid
@@ -50,8 +46,8 @@ function mostrarProductos(lista) {
         .map(
             (prod) => `
         <div class="producto-card">
-            <img src="../../src/img_productos/default.png" alt="Producto">
             <h3>${prod.nombre}</h3>
+            <img src="../../assets/src/img_productos/${prod.imagen}" alt="${prod.nombre}">
             <p>${prod.descripcion}</p>
             <div class="precio">$${prod.precio}</div>
             <button onclick="agregarAlCarrito(${prod.id})">Agregar al carrito</button>
@@ -61,9 +57,11 @@ function mostrarProductos(lista) {
         .join("");
 }
 
-// Mostrar categorías únicas en el filtro
-function mostrarCategorias() {
+// Llena el select de categorías únicas
+function cargarCategorias() {
     const select = document.getElementById("categoriaFiltro");
+    // Limpia opciones previas excepto la primera
+    select.innerHTML = '<option value="">Todas las categorías</option>';
     const categorias = [
         ...new Set(productos.map((p) => p.categoria).filter(Boolean)),
     ];
@@ -75,11 +73,11 @@ function mostrarCategorias() {
     });
 }
 
-// Filtrar productos por búsqueda y categoría
-function filtrarProductos() {
+// Aplica búsqueda y filtro por categoría
+function aplicarFiltros() {
     const texto = document.getElementById("buscador").value.toLowerCase();
     const categoria = document.getElementById("categoriaFiltro").value;
-    let filtrados = productos.filter(
+    const filtrados = productos.filter(
         (p) =>
             (p.nombre.toLowerCase().includes(texto) ||
                 p.descripcion.toLowerCase().includes(texto)) &&
@@ -88,61 +86,9 @@ function filtrarProductos() {
     mostrarProductos(filtrados);
 }
 
-// Carrito: agregar producto
-window.agregarAlCarrito = function (id) {
-    const prod = productos.find((p) => p.id === id);
-    if (!prod) return;
-    const item = carrito.find((i) => i.id === id);
-    if (item) {
-        item.cantidad += 1;
-    } else {
-        carrito.push({ ...prod, cantidad: 1 });
-    }
-    actualizarCarritoCantidad();
-};
-
-// Mostrar carrito en modal
-function mostrarCarrito() {
-    const modal = document.getElementById("modalCarrito");
-    const items = document.getElementById("carritoItems");
-    const total = document.getElementById("carritoTotal");
-    if (carrito.length === 0) {
-        items.innerHTML = "<p>El carrito está vacío.</p>";
-        total.textContent = "";
-    } else {
-        items.innerHTML = carrito
-            .map(
-                (item) => `
-            <div class="carrito-item">
-                <span>${item.nombre} x${item.cantidad}</span>
-                <span>$${(item.precio * item.cantidad).toFixed(2)}</span>
-                <button onclick="eliminarDelCarrito(${
-                    item.id
-                })">Eliminar</button>
-            </div>
-        `
-            )
-            .join("");
-        const suma = carrito.reduce(
-            (acc, item) => acc + item.precio * item.cantidad,
-            0
-        );
-        total.textContent = "Total: $" + suma.toFixed(2);
-    }
-    modal.style.display = "block";
-}
-
-// Eliminar producto del carrito
-window.eliminarDelCarrito = function (id) {
-    carrito = carrito.filter((item) => item.id !== id);
-    actualizarCarritoCantidad();
-    mostrarCarrito();
-};
-
-// Actualizar cantidad en el botón del carrito
-function actualizarCarritoCantidad() {
-    document.getElementById("carritoCantidad").textContent = carrito.reduce(
-        (acc, item) => acc + item.cantidad,
-        0
-    );
-}
+const numero = contacto.replace(/\D/g, ""); // Solo números
+const mensaje = encodeURIComponent(
+    `¡Gracias por tu compra!\nTu ticket:\nTotal: $${total}\nProductos:\n` +
+        carrito.map((item) => `- ${item.nombre} x${item.cantidad}`).join("\n")
+);
+window.open(`https://wa.me/${numero}?text=${mensaje}`, "_blank");

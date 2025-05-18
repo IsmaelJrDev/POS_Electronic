@@ -6,3 +6,4 @@ header('Content-Type: application/json');
 $productos = ProductoModel::obtenerProductos();
 echo json_encode($productos);
 ?>
+
