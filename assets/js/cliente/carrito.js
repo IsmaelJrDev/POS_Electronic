@@ -1,16 +1,18 @@
-// Carrito: agregar producto
 window.agregarAlCarrito = function (id) {
     const prod = productos.find((p) => p.id === id);
-    if (!prod) return;
+    if (!prod) return; // Si no existe el producto, no hace nada
+
     const item = carrito.find((i) => i.id === id);
+    const cantidadEnCarrito = item ? item.cantidad : 0;
+
     if (item) {
         item.cantidad += 1;
     } else {
         carrito.push({ ...prod, cantidad: 1 });
     }
+
     actualizarCarritoCantidad();
 };
-
 // Mostrar carrito en modal
 function mostrarCarrito() {
     const modal = document.getElementById("modalCarrito");
@@ -35,11 +37,17 @@ function mostrarCarrito() {
         `
             )
             .join("");
-        const suma = carrito.reduce(
+        const subtotal = carrito.reduce(
             (acc, item) => acc + item.precio * item.cantidad,
             0
         );
-        total.textContent = "Total: $" + suma.toFixed(2);
+        const iva = subtotal * 0.16;
+        const totalFinal = subtotal + iva;
+        total.innerHTML = `
+            <div>Subtotal: $${subtotal.toFixed(2)}</div>
+            <div>IVA (16%): $${iva.toFixed(2)}</div>
+            <div><strong>Total: $${totalFinal.toFixed(2)}</strong></div>
+        `;
         document.getElementById("btnFinalizarCompra").style.display = "block";
         document.getElementById("contacto").style.display = "block";
     }
@@ -54,15 +62,23 @@ document.getElementById("btnFinalizarCompra").onclick = function () {
         return;
     }
     if (carrito.length === 0) return;
-    const total = carrito.reduce(
+    const subtotal = carrito.reduce(
         (acc, item) => acc + item.precio * item.cantidad,
         0
     );
+    const iva = subtotal * 0.16; // 16% de IVA
+    const total = subtotal + iva;
 
     fetch("../../controller/ventaController.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productos: carrito, total, contacto }),
+        body: JSON.stringify({
+            productos: carrito,
+            total,
+            contacto,
+            iva,
+            subtotal,
+        }),
     })
         .then((res) => res.json())
         .then((data) => {
@@ -72,7 +88,11 @@ document.getElementById("btnFinalizarCompra").onclick = function () {
                 );
                 const numero = contacto.replace(/\D/g, "");
                 const mensaje = encodeURIComponent(
-                    `¡Gracias por tu compra!\nTu ticket:\nTotal: $${total}\nProductos:\n` +
+                    `¡Gracias por tu compra!\nTu ticket:\nSubtotal: $${subtotal.toFixed(
+                        2
+                    )}\nIVA: $${iva.toFixed(2)}\nTotal: $${total.toFixed(
+                        2
+                    )}\nProductos:\n` +
                         carrito
                             .map((item) => `- ${item.nombre} x${item.cantidad}`)
                             .join("\n")

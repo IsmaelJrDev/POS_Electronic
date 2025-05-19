@@ -1,5 +1,6 @@
 <?php
 require_once '../config/database.php';
+date_default_timezone_set('America/Mexico_City');
 
 class VentaModel {
     public static function registrarVenta($productos, $total, $contacto) {
@@ -17,17 +18,17 @@ class VentaModel {
                 $stmtStock = $conn->prepare("SELECT stock FROM productos WHERE id = :id FOR UPDATE");
                 $stmtStock->execute([':id' => $item['id']]);
                 $stock = $stmtStock->fetchColumn();
-
+                            
                 if ($stock === false || $stock < $item['cantidad']) {
                     $conn->rollBack();
-                    return ['success' => false, 'message' => "Stock insuficiente para el producto ID {$item['id']}"];
+                    return ['success' => false, 'message' => "No hay suficiente stock para el producto seleccionado."];
                 }
 
                 $stmtDetalle = $conn->prepare(
                 "INSERT INTO detalle_ventas (venta_id, producto_id, cantidad, precio_unitario, fecha, telefono)
                 VALUES (:venta_id, :producto_id, :cantidad, :precio, NOW(), :telefono)"
                 );
-                
+
                 $stmtDetalle->execute([
                     ':venta_id' => $venta_id,
                     ':producto_id' => $item['id'],
@@ -51,6 +52,18 @@ class VentaModel {
             $conn->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    public static function obtenerVentasTotales() {
+        global $conn;
+        $stmt = $conn->query("SELECT SUM(total) FROM ventas");
+        return $stmt->fetchColumn() ?: 0;
+    }
+
+    public static function obtenerVentasDiarias() {
+        global $conn;
+        $stmt = $conn->query("SELECT DATE(fecha) as dia, SUM(total) as total FROM ventas GROUP BY dia ORDER BY dia DESC LIMIT 7");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 ?>
