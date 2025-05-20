@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Productos | Punto de Venta</title>
+        <link rel="stylesheet" href="../../assets/css/cliente/dashboard.css" />
+    </head>
+    <body>
+        <header class="header">
+            <div class="container">
+                <h1>Catálogo de Productos</h1>
+                <button id="cerrarSesion" class="btn-cerrar-sesion">
+                    Cerrar sesión
+                </button>
+                <div class="filtros">
+                    <input
+                        type="text"
+                        id="buscador"
+                        placeholder="Buscar producto..."
+                    />
+                    <select id="categoriaFiltro">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                    <button id="verCarrito">
+                        🛒 Ver Carrito (<span id="carritoCantidad">0</span>)
+                    </button>
+                </div>
+            </div>
+        </header>
+        <main class="container">
+            <section id="productos" class="productos-grid"></section>
+        </main>
+        <!-- Modal del carrito -->
+        <div id="modalCarrito" class="modal">
+            <div class="modal-contenido">
+                <span class="cerrar" id="cerrarModal">&times;</span>
+                <h2>Carrito de Compras</h2>
+                <div id="carritoItems"></div>
+                <div id="carritoTotal"></div>
+                <input
+                    type="text"
+                    id="contacto"
+                    placeholder="Teléfono o correo electrónico"
+                    style="width: 100%; margin: 10px 0"
+                />
+                <button id="btnFinalizarCompra">Finalizar compra</button>
+            </div>
+        </div>
+        <footer class="footer">
+            <div class="container">
+                <p>
+                    &copy; 2025 Punto de Venta. Todos los derechos reservados.
+                </p>
+            </div>
+        </footer>
+        <script src="../../assets/js/cliente/dashboard.js"></script>
+        <script src="../../assets/js/cliente/carrito.js"></script>
+    </body>
+</html>
